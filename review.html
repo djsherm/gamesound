@@ -5,7 +5,8 @@
   {% for r in results %}
   {% set gi = loop.index0 %}
   <fieldset>
-    <legend>{{ r.game }}</legend>
+    <legend>{{ r.game }}{% if r.remembered %} <span class="meta">(saved choice)</span>{% endif %}</legend>
+    <input type="hidden" name="game_{{ gi }}" value="{{ r.game }}">
 
     {% if r.error %}
       <p class="warn">Search failed for this game: {{ r.error }}</p>
@@ -15,11 +16,11 @@
 
     {% for c in r.candidates %}
     <label class="opt">
-      <input type="checkbox" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id == r.selected_id %}checked{% endif %}>
+      <input type="checkbox" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id in r.selected_ids %}checked{% endif %}>
       {% if c.image %}<img src="{{ c.image }}" alt="">{% else %}<span class="noimg"></span>{% endif %}
       <span>
         {{ c.name }}
-        <span class="meta"><br>{{ c.artist }} · {{ c.year }} · {{ c.total_tracks }} tracks · match {{ c.score }}</span>
+        <span class="meta"><br>{{ c.artist }} · {{ c.year }} · {{ c.total_tracks }} tracks{% if c.score is not none %} · match {{ c.score }}{% endif %}</span>
       </span>
     </label>
     {% endfor %}

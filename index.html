@@ -26,6 +26,9 @@
 
   <form hx-post="/match" hx-target="#review" hx-indicator="#spinner">
     <textarea name="titles" placeholder="Hades&#10;Celeste&#10;The Witcher 3: Wild Hunt" required></textarea>
+    <label class="meta" style="display:block;margin-top:.4rem;">
+      <input type="checkbox" name="fresh" value="1"> Ignore saved matches and search again
+    </label>
     <button type="submit">Find soundtracks</button>
     <span id="spinner" class="htmx-indicator">Searching…</span>
   </form>

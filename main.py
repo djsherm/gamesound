@@ -10,10 +10,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from jinja2 import Environment, FileSystemLoader
 from starlette.middleware.sessions import SessionMiddleware
 
+import cache
 import matcher
 import spotify_client as sp
 
 load_dotenv()
+cache.init()
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET"])
@@ -30,16 +32,40 @@ async def index():
 
 
 @app.post("/match")
-async def match(titles: str = Form(...)):
+async def match(titles: str = Form(...), fresh: str = Form("")):
     """HTMX endpoint: returns the review form fragment."""
     seen, games = set(), []
     for line in titles.splitlines():
         t = line.strip()
-        if t and t.lower() not in seen:
-            seen.add(t.lower())
+        key = cache.game_key(t)
+        if t and key not in seen:
+            seen.add(key)
             games.append(t)
     games = games[:50]
-    results = await matcher.match_games(games)
+
+    # Games you've already confirmed skip the Spotify search entirely.
+    remembered = {}
+    if not fresh:
+        for g in games:
+            saved = cache.get_choice(g)
+            if saved:
+                remembered[g] = saved
+
+    searched = {r["game"]: r for r in await matcher.match_games([g for g in games if g not in remembered])}
+    for r in searched.values():
+        cache.save_albums(r["candidates"])  # so a later "create" can remember them
+
+    results = []
+    for g in games:
+        if g in remembered:
+            albums = remembered[g]
+            for a in albums:
+                a["score"] = None  # not scored; these came from your saved choice
+            results.append({"game": g, "candidates": albums,
+                            "selected_ids": [a["id"] for a in albums],
+                            "error": None, "remembered": True})
+        else:
+            results.append(searched[g])
     return render("review.html", results=results)
 
 
@@ -48,10 +74,20 @@ async def create(request: Request):
     """Plain form post (not HTMX) so the Spotify login redirect works."""
     form = await request.form()
     album_ids, seen = [], set()
-    for key, value in form.multi_items():
-        if key.startswith("pick_") and value and value not in seen:
-            seen.add(value)
-            album_ids.append(value)
+    for key, game in form.multi_items():
+        if not key.startswith("game_"):
+            continue
+        picks = [v for v in form.getlist("pick_" + key[len("game_"):]) if v]
+        # Remember exactly what was submitted: ticked albums are saved,
+        # a game with everything unticked is forgotten.
+        if picks:
+            cache.save_choice(game, picks)
+        else:
+            cache.delete_choice(game)
+        for v in picks:
+            if v not in seen:
+                seen.add(v)
+                album_ids.append(v)
     if not album_ids:
         return RedirectResponse("/", status_code=303)
 
