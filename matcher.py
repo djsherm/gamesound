@@ -51,15 +51,15 @@ async def _match_one(game: str, sem: asyncio.Semaphore) -> dict:
         try:
             albums = await sp.search_albums(f"{game} soundtrack")
         except Exception as exc:  # keep one failure from sinking the batch
-            return {"game": game, "candidates": [], "selected_id": None, "error": str(exc)}
+            return {"game": game, "candidates": [], "selected_ids": [], "error": str(exc)}
 
     for a in albums:
         a["score"] = score(game, a["name"])
     albums.sort(key=lambda a: a["score"], reverse=True)
     top = albums[:5]  # show a few more: multi-part soundtracks often rank lower
 
-    selected = top[0]["id"] if top and top[0]["score"] >= AUTO_SELECT_THRESHOLD else None
-    return {"game": game, "candidates": top, "selected_id": selected, "error": None}
+    selected = [top[0]["id"]] if top and top[0]["score"] >= AUTO_SELECT_THRESHOLD else []
+    return {"game": game, "candidates": top, "selected_ids": selected, "error": None}
 
 
 async def match_games(games: list[str]) -> list[dict]:
