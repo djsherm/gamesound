@@ -1,6 +1,6 @@
 <form action="/create" method="post">
   <h2>Review matches</h2>
-  <p class="meta">Pick the right album for each game, or choose "Skip". Games without a confident match start on Skip.</p>
+  <p class="meta">Tick every album you want for each game (handy for soundtracks split into several parts). Untick everything to skip a game. Only confident matches start ticked.</p>
 
   {% for r in results %}
   {% set gi = loop.index0 %}
@@ -15,7 +15,7 @@
 
     {% for c in r.candidates %}
     <label class="opt">
-      <input type="radio" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id == r.selected_id %}checked{% endif %}>
+      <input type="checkbox" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id == r.selected_id %}checked{% endif %}>
       {% if c.image %}<img src="{{ c.image }}" alt="">{% else %}<span class="noimg"></span>{% endif %}
       <span>
         {{ c.name }}
@@ -23,11 +23,6 @@
       </span>
     </label>
     {% endfor %}
-
-    <label class="opt">
-      <input type="radio" name="pick_{{ gi }}" value="" {% if not r.selected_id %}checked{% endif %}>
-      <span>Skip this game</span>
-    </label>
   </fieldset>
   {% endfor %}
 

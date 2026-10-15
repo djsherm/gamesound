@@ -56,7 +56,7 @@ async def _match_one(game: str, sem: asyncio.Semaphore) -> dict:
     for a in albums:
         a["score"] = score(game, a["name"])
     albums.sort(key=lambda a: a["score"], reverse=True)
-    top = albums[:3]
+    top = albums[:5]  # show a few more: multi-part soundtracks often rank lower
 
     selected = top[0]["id"] if top and top[0]["score"] >= AUTO_SELECT_THRESHOLD else None
     return {"game": game, "candidates": top, "selected_id": selected, "error": None}
