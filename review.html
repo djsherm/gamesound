@@ -1,0 +1,40 @@
+<form action="/create" method="post">
+  <h2>Review matches</h2>
+  <p class="meta">Pick the right album for each game, or choose "Skip". Games without a confident match start on Skip.</p>
+
+  {% for r in results %}
+  {% set gi = loop.index0 %}
+  <fieldset>
+    <legend>{{ r.game }}</legend>
+
+    {% if r.error %}
+      <p class="warn">Search failed for this game: {{ r.error }}</p>
+    {% elif not r.candidates %}
+      <p class="warn">No soundtrack found on Spotify.</p>
+    {% endif %}
+
+    {% for c in r.candidates %}
+    <label class="opt">
+      <input type="radio" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id == r.selected_id %}checked{% endif %}>
+      {% if c.image %}<img src="{{ c.image }}" alt="">{% else %}<span class="noimg"></span>{% endif %}
+      <span>
+        {{ c.name }}
+        <span class="meta"><br>{{ c.artist }} · {{ c.year }} · {{ c.total_tracks }} tracks · match {{ c.score }}</span>
+      </span>
+    </label>
+    {% endfor %}
+
+    <label class="opt">
+      <input type="radio" name="pick_{{ gi }}" value="" {% if not r.selected_id %}checked{% endif %}>
+      <span>Skip this game</span>
+    </label>
+  </fieldset>
+  {% endfor %}
+
+  <p>
+    <label>Playlist name:
+      <input type="text" name="playlist_name" value="Games I've played" style="font:inherit;padding:.3rem;">
+    </label>
+  </p>
+  <button type="submit">Create playlist on Spotify</button>
+</form>

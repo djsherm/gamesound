@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Soundtrack Playlist</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    textarea { width: 100%; min-height: 180px; padding: .6rem; font: inherit; box-sizing: border-box; }
+    button { padding: .6rem 1.2rem; font: inherit; cursor: pointer; margin-top: .6rem; }
+    .htmx-indicator { display: none; margin-left: .8rem; }
+    .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline; }
+    fieldset { margin: 1rem 0; border: 1px solid #8884; border-radius: 8px; }
+    legend { font-weight: 600; padding: 0 .4rem; }
+    label.opt { display: flex; align-items: center; gap: .7rem; padding: .35rem 0; cursor: pointer; }
+    label.opt img, .noimg { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: #8884; }
+    .meta { font-size: .85rem; opacity: .7; }
+    .warn { color: #b45309; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>Game Soundtrack Playlist</h1>
+  <p>Paste the games you've played, one per line. You'll review the matches before anything is created.</p>
+
+  <form hx-post="/match" hx-target="#review" hx-indicator="#spinner">
+    <textarea name="titles" placeholder="Hades&#10;Celeste&#10;The Witcher 3: Wild Hunt" required></textarea>
+    <button type="submit">Find soundtracks</button>
+    <span id="spinner" class="htmx-indicator">Searching…</span>
+  </form>
+
+  <div id="review"></div>
+</body>
+</html>

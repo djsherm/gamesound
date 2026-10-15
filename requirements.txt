@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+httpx
+jinja2
+python-multipart
+itsdangerous
+python-dotenv
