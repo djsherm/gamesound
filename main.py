@@ -3,6 +3,7 @@ import secrets
 import time
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -83,7 +84,18 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
 
 async def _finish(request: Request):
     pending = request.session.pop("pending")
-    result = await sp.create_playlist(
-        request.session["token"]["access_token"], pending["name"], pending["ids"]
-    )
+    try:
+        result = await sp.create_playlist(
+            request.session["token"]["access_token"], pending["name"], pending["ids"]
+        )
+    except httpx.HTTPStatusError as exc:
+        # Show Spotify's own explanation instead of a blank 500.
+        detail = exc.response.text[:500]
+        print(f"Spotify error {exc.response.status_code} on {exc.request.url}: {detail}")
+        return HTMLResponse(
+            f"<h1>Spotify returned {exc.response.status_code}</h1>"
+            f"<p><code>{exc.request.method} {exc.request.url}</code></p>"
+            f"<pre>{detail}</pre><p><a href='/'>Start over</a></p>",
+            status_code=502,
+        )
     return render("done.html", name=pending["name"], **result)

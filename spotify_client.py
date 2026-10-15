@@ -120,8 +120,6 @@ async def search_albums(query: str, limit: int = 10) -> list[dict]:
 
 async def create_playlist(user_token: str, name: str, album_ids: list[str]) -> dict:
     async with httpx.AsyncClient(timeout=30) as client:
-        me = (await _request(client, "GET", f"{API}/me", user_token)).json()
-
         # Collect every track URI from the chosen albums, in order.
         uris: list[str] = []
         for album_id in album_ids:
@@ -133,7 +131,7 @@ async def create_playlist(user_token: str, name: str, album_ids: list[str]) -> d
                 url, params = data.get("next"), None  # 'next' already has the query string
 
         playlist = (await _request(
-            client, "POST", f"{API}/users/{me['id']}/playlists", user_token,
+            client, "POST", f"{API}/me/playlists", user_token,  # Feb 2026: replaces /users/{id}/playlists
             json={
                 "name": name,
                 "public": False,
@@ -143,7 +141,7 @@ async def create_playlist(user_token: str, name: str, album_ids: list[str]) -> d
 
         for i in range(0, len(uris), 100):  # API limit: 100 tracks per request
             await _request(
-                client, "POST", f"{API}/playlists/{playlist['id']}/tracks", user_token,
+                client, "POST", f"{API}/playlists/{playlist['id']}/items", user_token,  # Feb 2026: replaces /tracks
                 json={"uris": uris[i:i + 100]},
             )
 

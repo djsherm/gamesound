@@ -6,7 +6,7 @@ import spotify_client as sp
 
 GOOD_WORDS = ("soundtrack", "ost", "original score", "game score", "original game", "game music")
 BAD_WORDS = ("remix", "cover", "tribute", "karaoke", "lofi", "lo-fi", "lullaby",
-             "piano collection", "for babies", "8-bit", "8 bit")
+             "piano collection", "for babies")
 FILLER = {"the", "a", "an", "of", "and", "original", "game", "music", "from", "edition",
           "deluxe", "vol", "volume", "official", "soundtrack", "ost", "score", "video"}
 
