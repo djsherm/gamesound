@@ -1,6 +1,7 @@
 import os
 import secrets
 import time
+from html import escape
 from pathlib import Path
 
 import httpx
@@ -67,6 +68,28 @@ async def match(titles: str = Form(...), fresh: str = Form("")):
         else:
             results.append(searched[g])
     return render("review.html", results=results)
+
+
+@app.get("/search")
+async def search(q: str = "", gi: int = 0):
+    """HTMX endpoint: free-text album search for one game on the review page.
+
+    Returns checkbox rows that get appended to that game's list, so anything
+    already ticked is kept. The query is sent to Spotify as typed.
+    """
+    q = q.strip()
+    if not q:
+        return HTMLResponse("")
+    try:
+        albums = await sp.search_albums(q)
+    except Exception as exc:
+        return HTMLResponse(f'<p class="warn">Search failed: {escape(str(exc))}</p>')
+    if not albums:
+        return HTMLResponse(f'<p class="meta">No albums found for "{escape(q)}".</p>')
+    for a in albums:
+        a["score"] = None  # not scored against the game; you're choosing by hand
+    cache.save_albums(albums)  # so a later "create" can remember what you tick
+    return render("_candidates.html", gi=gi, candidates=albums, selected_ids=[])
 
 
 @app.post("/create")

@@ -43,15 +43,34 @@ def score(game: str, album_name: str) -> int:
     extra = len(a_tokens - g_tokens - FILLER)  # words unrelated to the game title
     s -= min(15, extra * 3)
 
+    # An album named exactly like the game ("Minecraft") is very often the
+    # soundtrack itself. Floor its score so it beats partial title matches,
+    # while an explicit "(Original Soundtrack)" album (100) still ranks above it.
+    if _norm(album_name) == _norm(game):
+        s = max(s, 80)
+
     return max(0, min(100, round(s)))
 
 
 async def _match_one(game: str, sem: asyncio.Semaphore) -> dict:
+    # Two searches: "<game> soundtrack" finds the usual OSTs, and the bare title
+    # finds albums named exactly like the game, which the first query can miss.
     async with sem:
-        try:
-            albums = await sp.search_albums(f"{game} soundtrack")
-        except Exception as exc:  # keep one failure from sinking the batch
-            return {"game": game, "candidates": [], "selected_ids": [], "error": str(exc)}
+        batches = await asyncio.gather(
+            sp.search_albums(f"{game} soundtrack"),
+            sp.search_albums(game),
+            return_exceptions=True,  # keep one failure from sinking the game
+        )
+    ok = [b for b in batches if not isinstance(b, Exception)]
+    if not ok:
+        return {"game": game, "candidates": [], "selected_ids": [], "error": str(batches[0])}
+
+    albums, seen_ids = [], set()
+    for batch in ok:
+        for a in batch:
+            if a["id"] not in seen_ids:
+                seen_ids.add(a["id"])
+                albums.append(a)
 
     for a in albums:
         a["score"] = score(game, a["name"])

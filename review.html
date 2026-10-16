@@ -1,6 +1,6 @@
 <form action="/create" method="post">
   <h2>Review matches</h2>
-  <p class="meta">Tick every album you want for each game (handy for soundtracks split into several parts). Untick everything to skip a game. Only confident matches start ticked.</p>
+  <p class="meta">Tick every album you want for each game (handy for soundtracks split into several parts). Untick everything to skip a game. Only confident matches start ticked. If the right album isn't listed, search for it under the game.</p>
 
   {% for r in results %}
   {% set gi = loop.index0 %}
@@ -9,21 +9,23 @@
     <input type="hidden" name="game_{{ gi }}" value="{{ r.game }}">
 
     {% if r.error %}
-      <p class="warn">Search failed for this game: {{ r.error }}</p>
+      <p class="warn" id="warn_{{ gi }}">Search failed for this game: {{ r.error }}</p>
     {% elif not r.candidates %}
-      <p class="warn">No soundtrack found on Spotify.</p>
+      <p class="warn" id="warn_{{ gi }}">No soundtrack found on Spotify.</p>
     {% endif %}
 
-    {% for c in r.candidates %}
-    <label class="opt">
-      <input type="checkbox" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id in r.selected_ids %}checked{% endif %}>
-      {% if c.image %}<img src="{{ c.image }}" alt="">{% else %}<span class="noimg"></span>{% endif %}
-      <span>
-        {{ c.name }}
-        <span class="meta"><br>{{ c.artist }} · {{ c.year }} · {{ c.total_tracks }} tracks{% if c.score is not none %} · match {{ c.score }}{% endif %}</span>
-      </span>
-    </label>
-    {% endfor %}
+    <div class="cands" id="cands_{{ gi }}">
+      {% with candidates=r.candidates, selected_ids=r.selected_ids %}
+        {% include "_candidates.html" %}
+      {% endwith %}
+    </div>
+
+    <div class="search">
+      <input type="text" id="q_{{ gi }}" name="q" placeholder="Search Spotify for another album, e.g. {{ r.game }} Volume 2"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();this.nextElementSibling.click();}">
+      <button type="button" hx-get="/search" hx-include="#q_{{ gi }}" hx-vals='{"gi": {{ gi }}}'
+              hx-target="#cands_{{ gi }}" hx-swap="beforeend">Search</button>
+    </div>
   </fieldset>
   {% endfor %}
 

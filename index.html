@@ -18,6 +18,9 @@
     label.opt img, .noimg { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: #8884; }
     .meta { font-size: .85rem; opacity: .7; }
     .warn { color: #b45309; font-size: .9rem; }
+    .search { display: flex; gap: .5rem; margin: .5rem 0; }
+    .search input { flex: 1; font: inherit; padding: .3rem; }
+    .search button { margin-top: 0; padding: .3rem .9rem; }
   </style>
 </head>
 <body>
@@ -34,5 +37,20 @@
   </form>
 
   <div id="review"></div>
+
+  <script>
+    // After a per-game search appends results: drop albums already listed for
+    // that game, and clear the "no soundtrack found" warning once there is something to pick.
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      var t = e.detail.target;
+      if (!t || !t.classList || !t.classList.contains('cands')) return;
+      var seen = {};
+      t.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+        if (seen[cb.value]) { cb.closest('label').remove(); } else { seen[cb.value] = true; }
+      });
+      var warn = document.getElementById('warn_' + t.id.replace('cands_', ''));
+      if (warn && t.querySelector('input[type=checkbox]')) warn.remove();
+    });
+  </script>
 </body>
 </html>
