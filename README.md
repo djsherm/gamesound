@@ -9,8 +9,6 @@ Paste a list of games, review the matched soundtrack albums, and create a Spotif
 3. Install and run:
 
 ```
-source .venv/bin/activate
-
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
@@ -20,6 +18,7 @@ uvicorn main:app --reload
 ## How it works
 
 - `matcher.py` searches Spotify for `"<game> soundtrack"` and scores results (title overlap, soundtrack/OST keywords, penalties for remixes/covers/tributes). The top candidate is preselected only if it scores 60+.
+- `rawg.py` (optional) normalizes titles: "witcher 3" becomes "The Witcher 3: Wild Hunt" (2015). Get a free key at https://rawg.io/apidocs and put it in `.env` as `RAWG_API_KEY`; without it titles are used as typed. The canonical name is used for the Spotify searches and scoring (we also still search what you typed if it differs), and a release-year match gives albums a small bonus. Lookups are cached in SQLite, including "no match", and "Ignore saved matches" re-checks them. RAWG's free tier is for non-commercial use, allows 20,000 requests per month, and requires a link back to RAWG (the page shows one when the key is set). A title only resolves if RAWG's name contains most of your typed words, so abbreviations like "BOTW" fall back to the typed title.
 - Each game gets two searches (`"<game> soundtrack"` and the bare title) so albums named exactly like the game are found too; an exact-name album scores at least 80.
 - Under every game on the review page is a search box for albums the rules can't find (e.g. "Minecraft Volume Alpha"). Results are appended to that game's list, unticked, and your existing ticks are kept.
 - `spotify_client.py` wraps search (client-credentials token) and playlist creation (user OAuth, tracks added in batches of 100).
@@ -36,4 +35,3 @@ uvicorn main:app --reload
 ## Next steps
 
 - Steam library import (Steam Web API, needs a public profile).
-- Canonical title lookup via IGDB/RAWG before searching.

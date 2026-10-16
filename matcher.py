@@ -21,8 +21,12 @@ def _norm(text: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", text.lower()))
 
 
-def score(game: str, album_name: str) -> int:
-    """Heuristic 0-100: how likely is this album the soundtrack for this game?"""
+def score(game: str, album_name: str, album_year=None, game_year: int | None = None) -> int:
+    """Heuristic 0-100: how likely is this album the soundtrack for this game?
+
+    album_year / game_year are optional; when both are known, an album released
+    within two years of the game gets a small bonus.
+    """
     g_tokens = _tokens(game) - {"the", "a", "an", "of"}
     a_tokens = _tokens(album_name)
     if not g_tokens:
@@ -43,6 +47,9 @@ def score(game: str, album_name: str) -> int:
     extra = len(a_tokens - g_tokens - FILLER)  # words unrelated to the game title
     s -= min(15, extra * 3)
 
+    if game_year and str(album_year or "").isdigit() and abs(int(album_year) - game_year) <= 2:
+        s += 5
+
     # An album named exactly like the game ("Minecraft") is very often the
     # soundtrack itself. Floor its score so it beats partial title matches,
     # while an explicit "(Original Soundtrack)" album (100) still ranks above it.
@@ -52,13 +59,22 @@ def score(game: str, album_name: str) -> int:
     return max(0, min(100, round(s)))
 
 
-async def _match_one(game: str, sem: asyncio.Semaphore) -> dict:
-    # Two searches: "<game> soundtrack" finds the usual OSTs, and the bare title
-    # finds albums named exactly like the game, which the first query can miss.
+async def _match_one(game: str, sem: asyncio.Semaphore, info: dict | None = None) -> dict:
+    # `info` is the RAWG lookup ({'name', 'year'}) when available. We search with
+    # the canonical title, and also with what you typed if it differs, in case
+    # RAWG picked the wrong game.
+    canon = info["name"] if info else game
+    game_year = info.get("year") if info else None
+
+    # "<title> soundtrack" finds the usual OSTs; the bare title finds albums named
+    # exactly like the game, which the first query can miss.
+    queries = [f"{canon} soundtrack", canon]
+    if _norm(game) != _norm(canon):
+        queries.append(game)
+
     async with sem:
         batches = await asyncio.gather(
-            sp.search_albums(f"{game} soundtrack"),
-            sp.search_albums(game),
+            *(sp.search_albums(q) for q in queries),
             return_exceptions=True,  # keep one failure from sinking the game
         )
     ok = [b for b in batches if not isinstance(b, Exception)]
@@ -72,15 +88,19 @@ async def _match_one(game: str, sem: asyncio.Semaphore) -> dict:
                 seen_ids.add(a["id"])
                 albums.append(a)
 
+    names = {game, canon}  # score against what you typed and the canonical title; keep the better
     for a in albums:
-        a["score"] = score(game, a["name"])
+        a["score"] = max(score(n, a["name"], a.get("year"), game_year) for n in names)
     albums.sort(key=lambda a: a["score"], reverse=True)
     top = albums[:5]  # show a few more: multi-part soundtracks often rank lower
 
     selected = [top[0]["id"]] if top and top[0]["score"] >= AUTO_SELECT_THRESHOLD else []
-    return {"game": game, "candidates": top, "selected_ids": selected, "error": None}
+    return {"game": game, "candidates": top, "selected_ids": selected, "error": None,
+            "canonical": canon if info else None, "year": game_year}
 
 
-async def match_games(games: list[str]) -> list[dict]:
+async def match_games(games: list[str], resolved: dict[str, dict] | None = None) -> list[dict]:
+    """`resolved` maps each typed title to its RAWG info ({'name', 'year'}); optional."""
+    resolved = resolved or {}
     sem = asyncio.Semaphore(4)  # be polite to the API
-    return await asyncio.gather(*(_match_one(g, sem) for g in games))
+    return await asyncio.gather(*(_match_one(g, sem, resolved.get(g)) for g in games))

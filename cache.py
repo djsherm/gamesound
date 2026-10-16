@@ -30,6 +30,12 @@ CREATE TABLE IF NOT EXISTS choices (
     album_ids  TEXT NOT NULL,   -- JSON list, in the order they should be added
     updated_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS games (
+    game_key   TEXT PRIMARY KEY,   -- what you typed, normalized
+    canonical  TEXT,               -- RAWG's title; NULL = looked up, no confident match
+    year       INTEGER,
+    updated_at REAL NOT NULL
+);
 """
 
 
@@ -102,3 +108,23 @@ def save_choice(game: str, album_ids: list[str]) -> None:
 def delete_choice(game: str) -> None:
     with _db() as conn:
         conn.execute("DELETE FROM choices WHERE game_key = ?", (game_key(game),))
+
+
+def get_game(game: str) -> dict | None:
+    """Cached RAWG lookup: {'name', 'year'} (name is None for a cached miss), or None if never looked up."""
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT canonical, year FROM games WHERE game_key = ?", (game_key(game),)
+        ).fetchone()
+    return None if row is None else {"name": row["canonical"], "year": row["year"]}
+
+
+def save_game(game: str, info: dict | None) -> None:
+    """Remember a RAWG result, or a confirmed miss (info=None) so we don't ask again."""
+    with _db() as conn:
+        conn.execute(
+            """INSERT INTO games (game_key, canonical, year, updated_at) VALUES (?, ?, ?, ?)
+               ON CONFLICT(game_key) DO UPDATE SET
+                 canonical=excluded.canonical, year=excluded.year, updated_at=excluded.updated_at""",
+            (game_key(game), info["name"] if info else None, info.get("year") if info else None, time.time()),
+        )

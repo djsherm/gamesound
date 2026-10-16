@@ -1,3 +1,4 @@
+import asyncio
 import os
 import secrets
 import time
@@ -13,6 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import cache
 import matcher
+import rawg
 import spotify_client as sp
 
 load_dotenv()
@@ -29,7 +31,34 @@ def render(template: str, **ctx) -> HTMLResponse:
 
 @app.get("/")
 async def index():
-    return render("index.html")
+    return render("index.html", rawg_enabled=rawg.enabled())
+
+
+async def _resolve_names(games: list[str], fresh: bool) -> dict[str, dict]:
+    """Typed title -> {'name', 'year'} for games RAWG recognised.
+
+    Empty when RAWG isn't configured. Lookups (including confirmed misses) are
+    cached; lookup failures are not, so they are retried next time.
+    """
+    if not rawg.enabled():
+        return {}
+    sem = asyncio.Semaphore(4)
+
+    async def one(g: str):
+        if not fresh:
+            saved = cache.get_game(g)
+            if saved is not None:
+                return g, (saved if saved["name"] else None)
+        async with sem:
+            try:
+                info = await rawg.resolve(g)
+            except Exception as exc:  # keep going with the typed title
+                print(f"RAWG lookup failed for {g!r}: {exc}")
+                return g, None
+        cache.save_game(g, info)
+        return g, info
+
+    return {g: info for g, info in await asyncio.gather(*(one(g) for g in games)) if info}
 
 
 @app.post("/match")
@@ -52,7 +81,9 @@ async def match(titles: str = Form(...), fresh: str = Form("")):
             if saved:
                 remembered[g] = saved
 
-    searched = {r["game"]: r for r in await matcher.match_games([g for g in games if g not in remembered])}
+    to_search = [g for g in games if g not in remembered]
+    resolved = await _resolve_names(to_search, bool(fresh))
+    searched = {r["game"]: r for r in await matcher.match_games(to_search, resolved)}
     for r in searched.values():
         cache.save_albums(r["candidates"])  # so a later "create" can remember them
 

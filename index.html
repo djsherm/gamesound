@@ -38,6 +38,10 @@
 
   <div id="review"></div>
 
+  {% if rawg_enabled %}
+  <p class="meta" style="margin-top:2rem;">Game titles resolved with <a href="https://rawg.io/" target="_blank" rel="noopener">RAWG</a>.</p>
+  {% endif %}
+
   <script>
     // After a per-game search appends results: drop albums already listed for
     // that game, and clear the "no soundtrack found" warning once there is something to pick.

@@ -7,6 +7,9 @@
   <fieldset>
     <legend>{{ r.game }}{% if r.remembered %} <span class="meta">(saved choice)</span>{% endif %}</legend>
     <input type="hidden" name="game_{{ gi }}" value="{{ r.game }}">
+    {% if r.canonical %}
+      <p class="meta">Matched on RAWG as <strong>{{ r.canonical }}</strong>{% if r.year %} ({{ r.year }}){% endif %}</p>
+    {% endif %}
 
     {% if r.error %}
       <p class="warn" id="warn_{{ gi }}">Search failed for this game: {{ r.error }}</p>
