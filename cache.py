@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("GAMESOUND_DB", Path(__file__).parent / "gamesound.db"))
+LASTFM_CACHE_TTL = 7 * 24 * 60 * 60
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS albums (
@@ -42,6 +43,11 @@ CREATE TABLE IF NOT EXISTS pending_playlists (
     id         TEXT PRIMARY KEY,
     payload    TEXT NOT NULL,
     created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lastfm_stats (
+    track_key  TEXT PRIMARY KEY,
+    stats      TEXT NOT NULL,
+    updated_at REAL NOT NULL
 );
 """
 
@@ -158,6 +164,33 @@ def consume_pending(pending_id: str) -> dict | None:
         if row:
             conn.execute("DELETE FROM pending_playlists WHERE id = ?", (pending_id,))
     return json.loads(row["payload"]) if row else None
+
+
+def _lastfm_track_key(artist: str, track: str) -> str:
+    artist_key = " ".join(re.findall(r"[^\W_]+", artist.casefold(), flags=re.UNICODE))
+    track_key = " ".join(re.findall(r"[^\W_]+", track.casefold(), flags=re.UNICODE))
+    return f"{artist_key}\x1f{track_key}"
+
+
+def get_lastfm_stats(artist: str, track: str) -> tuple[bool, dict | None]:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT stats, updated_at FROM lastfm_stats WHERE track_key = ?",
+            (_lastfm_track_key(artist, track),),
+        ).fetchone()
+    if row is None or time.time() - row["updated_at"] > LASTFM_CACHE_TTL:
+        return False, None
+    return True, json.loads(row["stats"])
+
+
+def save_lastfm_stats(artist: str, track: str, stats: dict | None) -> None:
+    with _db() as conn:
+        conn.execute(
+            """INSERT INTO lastfm_stats (track_key, stats, updated_at) VALUES (?, ?, ?)
+               ON CONFLICT(track_key) DO UPDATE SET
+                 stats=excluded.stats, updated_at=excluded.updated_at""",
+            (_lastfm_track_key(artist, track), json.dumps(stats), time.time()),
+        )
 
 
 def delete_choice(game: str) -> None:

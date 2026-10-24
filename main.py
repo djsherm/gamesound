@@ -13,6 +13,7 @@ from jinja2 import Environment, FileSystemLoader
 from starlette.middleware.sessions import SessionMiddleware
 
 import cache
+import lastfm
 import matcher
 import rawg
 import spotify_client as sp
@@ -133,9 +134,11 @@ async def album_tracks(album_id: str, gi: int = 0, saved: bool = False, selected
         tracks = await sp.get_album_tracks(album_id)
     except Exception as exc:
         return HTMLResponse(f'<p class="warn">Could not load tracks: {escape(str(exc))}</p>')
+    await lastfm.enrich_tracks(tracks)
     return render(
         "_tracks.html", gi=gi, album_id=album_id, tracks=tracks,
         saved=saved, selected_ids=selected.split(",") if selected else [],
+        lastfm_enabled=lastfm.enabled(),
     )
 
 

@@ -1,11 +1,13 @@
 <input type="hidden" name="track_selection_{{ album_id }}" value="1">
-<p class="meta">Select individual tracks. If you leave this list unopened, the whole album is added. Spotify does not expose exact play counts; popularity is an approximate 0–100 score when available.</p>
+<p class="meta">Select individual tracks. If you leave this list unopened, the whole album is added.
+  {% if lastfm_enabled %}Last.fm scrobbles and listeners are community counts, not Spotify stream counts; unmatched tracks have no stats.
+  {% else %}Add a <code>LASTFM_API_KEY</code> to show community scrobble counts. Spotify does not expose exact play counts.{% endif %}</p>
 <ol class="tracks">
   {% for t in tracks %}
   <li>
     <label class="track">
       <input type="checkbox" name="track_pick_{{ album_id }}" value="{{ t.id }}" {% if saved and t.id in selected_ids %}checked{% endif %}>
-      <span class="track-title"><strong>{{ t.disc_number }}.{{ t.track_number }}</strong> {{ t.name }}<br><span class="meta">{{ t.artist }} · {{ t.duration }}{% if t.popularity is not none %} · popularity {{ t.popularity }}/100{% endif %}</span></span>
+      <span class="track-title"><strong>{{ t.disc_number }}.{{ t.track_number }}</strong> {{ t.name }}<br><span class="meta">{{ t.artist }} · {{ t.duration }}{% if t.lastfm %} · {{ "{:,}".format(t.lastfm.playcount) }} Last.fm scrobbles · {{ "{:,}".format(t.lastfm.listeners) }} listeners{% elif t.popularity is not none %} · Spotify popularity {{ t.popularity }}/100{% endif %}</span></span>
       {% if t.url %}<a href="{{ t.url }}" target="_blank" rel="noopener">Spotify</a>{% endif %}
     </label>
   </li>

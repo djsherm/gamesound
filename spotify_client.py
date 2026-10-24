@@ -156,6 +156,7 @@ async def get_album_tracks(album_id: str) -> list[dict]:
             "id": track["id"],
             "name": track["name"],
             "artist": ", ".join(artist["name"] for artist in track.get("artists", [])),
+            "lastfm_artist": (track.get("artists") or [{}])[0].get("name", ""),
             "disc_number": track.get("disc_number", 1),
             "track_number": track.get("track_number", 0),
             "duration": f"{track.get('duration_ms', 0) // 60000}:{(track.get('duration_ms', 0) // 1000) % 60:02}",
