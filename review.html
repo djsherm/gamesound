@@ -23,11 +23,14 @@
       {% endwith %}
     </div>
 
+    {% if r.remembered %}
+    <p class="meta">Your saved albums stay selected. Search here to add more albums for this game without replacing them.</p>
+    {% endif %}
     <div class="search">
-      <input type="text" id="q_{{ gi }}" name="q" placeholder="Search Spotify for another album, e.g. {{ r.game }} Volume 2"
+      <input type="text" id="q_{{ gi }}" name="q" placeholder="Search Spotify for another album, e.g. Minecraft Volume Alpha"
              onkeydown="if(event.key==='Enter'){event.preventDefault();this.nextElementSibling.click();}">
       <button type="button" hx-get="/search" hx-include="#q_{{ gi }}" hx-vals='{"gi": {{ gi }}}'
-              hx-target="#cands_{{ gi }}" hx-swap="beforeend">Search</button>
+              hx-target="#cands_{{ gi }}" hx-swap="beforeend">Search albums</button>
     </div>
   </fieldset>
   {% endfor %}
