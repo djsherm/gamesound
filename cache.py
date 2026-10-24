@@ -8,6 +8,7 @@ Two tables:
 import json
 import os
 import re
+import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS choices (
     game_key   TEXT PRIMARY KEY,
     game       TEXT NOT NULL,
     album_ids  TEXT NOT NULL,   -- JSON list, in the order they should be added
+    track_ids  TEXT NOT NULL DEFAULT '{}',
     updated_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS games (
@@ -35,6 +37,11 @@ CREATE TABLE IF NOT EXISTS games (
     canonical  TEXT,               -- RAWG's title; NULL = looked up, no confident match
     year       INTEGER,
     updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pending_playlists (
+    id         TEXT PRIMARY KEY,
+    payload    TEXT NOT NULL,
+    created_at REAL NOT NULL
 );
 """
 
@@ -53,6 +60,9 @@ def _db():
 def init() -> None:
     with _db() as conn:
         conn.executescript(SCHEMA)
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(choices)")}
+        if "track_ids" not in columns:
+            conn.execute("ALTER TABLE choices ADD COLUMN track_ids TEXT NOT NULL DEFAULT '{}' ")
 
 
 def game_key(title: str) -> str:
@@ -95,14 +105,59 @@ def get_choice(game: str) -> list[dict] | None:
 
 
 def save_choice(game: str, album_ids: list[str]) -> None:
+    save_choice_with_tracks(game, album_ids)
+
+
+def get_track_choices(game: str) -> dict[str, list[str]]:
     with _db() as conn:
+        row = conn.execute(
+            "SELECT track_ids FROM choices WHERE game_key = ?", (game_key(game),)
+        ).fetchone()
+    return json.loads(row["track_ids"]) if row else {}
+
+
+def save_choice_with_tracks(
+    game: str, album_ids: list[str], track_choices: dict[str, list[str]] | None = None
+) -> None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT track_ids FROM choices WHERE game_key = ?", (game_key(game),)
+        ).fetchone()
+        previous = json.loads(row["track_ids"]) if row else {}
+        saved_tracks = {album_id: previous[album_id] for album_id in album_ids if album_id in previous}
+        for album_id, track_ids in (track_choices or {}).items():
+            if album_id in album_ids:
+                saved_tracks[album_id] = track_ids
         conn.execute(
-            """INSERT INTO choices (game_key, game, album_ids, updated_at)
-               VALUES (?, ?, ?, ?)
+            """INSERT INTO choices (game_key, game, album_ids, track_ids, updated_at)
+               VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(game_key) DO UPDATE SET
-                 game=excluded.game, album_ids=excluded.album_ids, updated_at=excluded.updated_at""",
-            (game_key(game), game, json.dumps(album_ids), time.time()),
+                 game=excluded.game, album_ids=excluded.album_ids,
+                 track_ids=excluded.track_ids, updated_at=excluded.updated_at""",
+            (game_key(game), game, json.dumps(album_ids), json.dumps(saved_tracks), time.time()),
         )
+
+
+def save_pending(payload: dict) -> str:
+    pending_id = secrets.token_urlsafe(18)
+    now = time.time()
+    with _db() as conn:
+        conn.execute("DELETE FROM pending_playlists WHERE created_at < ?", (now - 86400,))
+        conn.execute(
+            "INSERT INTO pending_playlists (id, payload, created_at) VALUES (?, ?, ?)",
+            (pending_id, json.dumps(payload), now),
+        )
+    return pending_id
+
+
+def consume_pending(pending_id: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT payload FROM pending_playlists WHERE id = ?", (pending_id,)
+        ).fetchone()
+        if row:
+            conn.execute("DELETE FROM pending_playlists WHERE id = ?", (pending_id,))
+    return json.loads(row["payload"]) if row else None
 
 
 def delete_choice(game: str) -> None:

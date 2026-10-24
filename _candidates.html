@@ -1,10 +1,14 @@
 {% for c in candidates %}
-<label class="opt">
-  <input type="checkbox" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id in selected_ids %}checked{% endif %}>
-  {% if c.image %}<img src="{{ c.image }}" alt="">{% else %}<span class="noimg"></span>{% endif %}
-  <span>
-    {{ c.name }}
-    <span class="meta"><br>{{ c.artist }} · {{ c.year }} · {{ c.total_tracks }} tracks{% if c.score is not none %} · match {{ c.score }}{% endif %}</span>
-  </span>
-</label>
+<div class="album-option">
+  <label class="opt">
+    <input type="checkbox" name="pick_{{ gi }}" value="{{ c.id }}" {% if c.id in selected_ids %}checked{% endif %}>
+    {% if c.image %}<img src="{{ c.image }}" alt="">{% else %}<span class="noimg"></span>{% endif %}
+    <span>
+      {{ c.name }}
+      <span class="meta"><br>{{ c.artist }} · {{ c.year }} · {{ c.total_tracks }} tracks{% if c.score is not none %} · match {{ c.score }}{% endif %}</span>
+    </span>
+  </label>
+  <button class="track-toggle" type="button" hx-get="/album-tracks/{{ c.id }}" hx-vals='{"gi": {{ gi }}, "saved": {{ c.track_selection_saved | default(false) | tojson }}, "selected": {{ (c.selected_track_ids | default([])) | join(",") | tojson }}}' hx-target="#tracks_{{ gi }}_{{ c.id }}" hx-swap="innerHTML">Choose tracks</button>
+</div>
+<div class="track-list" id="tracks_{{ gi }}_{{ c.id }}"></div>
 {% endfor %}

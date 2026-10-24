@@ -116,13 +116,72 @@ async def search_albums(query: str, limit: int = 10) -> list[dict]:
     return albums
 
 
+async def get_album_tracks(album_id: str) -> list[dict]:
+    """Return an album's tracks in album order, with popularity when available."""
+    async with httpx.AsyncClient(timeout=20) as client:
+        token = await _get_app_token(client)
+        url = f"{API}/albums/{album_id}/tracks"
+        params = {"limit": 50}
+        items = []
+        while url:
+            data = (await _request(client, "GET", url, token, params=params)).json()
+            items.extend(data["items"])
+            url, params = data.get("next"), None
+
+        popularity = {}
+        for start in range(0, len(items), 50):
+            ids = [track["id"] for track in items[start:start + 50] if track.get("id")]
+            if not ids:
+                continue
+            try:
+                data = (await _request(
+                    client, "GET", f"{API}/tracks", token, params={"ids": ",".join(ids)}
+                )).json()
+            except httpx.HTTPError as exc:
+                status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else str(exc)
+                print(f"Spotify track popularity unavailable: {status}")
+                break
+            popularity.update({
+                track["id"]: track.get("popularity")
+                for track in data.get("tracks", []) if track
+            })
+
+    ordered = sorted(
+        enumerate(items),
+        key=lambda pair: (pair[1].get("disc_number", 1), pair[1].get("track_number", 0), pair[0]),
+    )
+    tracks = []
+    for _, track in ordered:
+        tracks.append({
+            "id": track["id"],
+            "name": track["name"],
+            "artist": ", ".join(artist["name"] for artist in track.get("artists", [])),
+            "disc_number": track.get("disc_number", 1),
+            "track_number": track.get("track_number", 0),
+            "duration": f"{track.get('duration_ms', 0) // 60000}:{(track.get('duration_ms', 0) // 1000) % 60:02}",
+            "popularity": popularity.get(track["id"]),
+            "url": track.get("external_urls", {}).get("spotify"),
+        })
+    return tracks
+
+
 # ---------- playlist creation ----------
 
-async def create_playlist(user_token: str, name: str, album_ids: list[str]) -> dict:
+async def create_playlist(user_token: str, name: str, albums: list) -> dict:
     async with httpx.AsyncClient(timeout=30) as client:
-        # Collect every track URI from the chosen albums, in order.
+        # Explicit track selections arrive in album order from the review form.
         uris: list[str] = []
-        for album_id in album_ids:
+        for album in albums:
+            if isinstance(album, dict):
+                album_id = album["id"]
+                track_ids = album.get("track_ids")
+            else:
+                album_id = album
+                track_ids = None
+            if track_ids is not None:
+                uris.extend(f"spotify:track:{track_id}" for track_id in track_ids)
+                continue
+
             url = f"{API}/albums/{album_id}/tracks"
             params = {"limit": 50}
             while url:

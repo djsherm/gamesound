@@ -12,9 +12,16 @@
     button { padding: .6rem 1.2rem; font: inherit; cursor: pointer; margin-top: .6rem; }
     .htmx-indicator { display: none; margin-left: .8rem; }
     .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline; }
-    fieldset { margin: 1rem 0; border: 1px solid #8884; border-radius: 8px; }
+    fieldset { min-width: 0; margin: 1rem 0; border: 1px solid #8884; border-radius: 8px; }
     legend { font-weight: 600; padding: 0 .4rem; }
     label.opt { display: flex; align-items: center; gap: .7rem; padding: .35rem 0; cursor: pointer; }
+    .album-option { display: flex; align-items: center; gap: .6rem; }
+    .album-option label.opt { flex: 1; min-width: 0; }
+    .track-toggle { flex: none; margin-top: 0; padding: .3rem .6rem; }
+    .track-list { margin: 0 0 .5rem 3.6rem; padding: .35rem .7rem; border-left: 2px solid #8884; }
+    .tracks { list-style: none; padding: 0; margin: .35rem 0; }
+    .track { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .55rem; padding: .3rem 0; }
+    .track-title { min-width: 0; overflow-wrap: anywhere; }
     label.opt img, .noimg { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: #8884; }
     .meta { font-size: .85rem; opacity: .7; }
     .warn { color: #b45309; font-size: .9rem; }
@@ -49,8 +56,17 @@
       var t = e.detail.target;
       if (!t || !t.classList || !t.classList.contains('cands')) return;
       var seen = {};
-      t.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
-        if (seen[cb.value]) { cb.closest('label').remove(); } else { seen[cb.value] = true; }
+      t.querySelectorAll('input[name^="pick_"]').forEach(function (cb) {
+        if (seen[cb.value]) {
+          var option = cb.closest('.album-option');
+          if (option) {
+            var tracks = option.nextElementSibling;
+            if (tracks && tracks.classList.contains('track-list')) tracks.remove();
+            option.remove();
+          } else {
+            cb.closest('label').remove();
+          }
+        } else { seen[cb.value] = true; }
       });
       var warn = document.getElementById('warn_' + t.id.replace('cands_', ''));
       if (warn && t.querySelector('input[type=checkbox]')) warn.remove();
